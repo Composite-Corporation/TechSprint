@@ -124,29 +124,40 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
 
 @st.dialog(title="Add New Supplier", width="large")
 def add_dialog():
-    with st.form(key="supplier_form", border=False):
-        # Input fields for the supplier details
-        name = st.text_input(label="Company Name:red[*]", help="Required field.")
-        website = st.text_input(label="Website", help="If empty, will be auto-populated using AI.")
-        description = st.text_area(label="Description", help="If empty, will be auto-populated using AI.")
-        notes = st.text_area(label="Notes")
-        
-        # Submit button
-        submit = st.form_submit_button("Confirm")
+    tab1, tab2 = st.tabs(["Individual Upload", "Bulk Upload"])
+    with tab1:
+        with st.form(key="supplier_form", border=False):
+            # Input fields for the supplier details
+            name = st.text_input(label="Company Name:red[*]", help="Required field.")
+            website = st.text_input(label="Website", help="If empty, will be auto-populated using AI.")
+            description = st.text_area(label="Description", help="If empty, will be auto-populated using AI.")
+            notes = st.text_area(label="Notes")
+            
+            # Submit button
+            submit = st.form_submit_button("Confirm")
 
-        # Submit logic
-        if submit:
-            if name:
-                st.session_state["page"]["data"]["processing_supplier"] = True
-                st.session_state["page"]["data"]["add_supplier"] = {
-                    "name": name,
-                    "website": website,
-                    "description": description,
-                    "notes": notes,
-                }
-                st.rerun()
-            else:
-                st.error("Please provide the supplier name.")
+            # Submit logic
+            if submit:
+                if name:
+                    st.session_state["page"]["data"]["processing_supplier"] = True
+                    st.session_state["page"]["data"]["add_supplier"] = {
+                        "name": name,
+                        "website": website,
+                        "description": description,
+                        "notes": notes,
+                    }
+                    st.rerun()
+                else:
+                    st.error("Please provide the supplier name.")
+    with tab2:
+        uploaded_file = st.file_uploader(
+            label="Choose CSV or Excel File", 
+            accept_multiple_files=False,
+            type=['csv', 'xlsx'],
+        )
+        if uploaded_file:
+            st.write(":orange[Bulk uploading is a work in progress... Check back with us later...]")
+
 
 
 def home_page():
