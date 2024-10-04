@@ -1,10 +1,18 @@
 import time
 import uuid
 import streamlit as st
-from datetime import date
+from datetime import datetime
+import pytz
 from fuzzywuzzy import fuzz, process
 from typing import List
-from components.supplier import supplier_display, supplier_obtain_esg_data, Supplier, ESGData
+from components.supplier import (
+    supplier_display, 
+    supplier_obtain_esg_data, 
+    Supplier, 
+    ESGData,
+    DataSummary,
+    AgentSupplier,
+)
 
 
 # Function to perform fuzzy search on company names and return results with ids
@@ -36,31 +44,48 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
     """
     esg_score = 0
 
-    task_basic_info = task_prefix + "\nUse the web to find a URL to the company's website and come up with your best description on what this company does."
-    data_basic_info = supplier_obtain_esg_data(label="Basic Information", task=task_basic_info)
+    task_basic_info = task_prefix + """
+    \nUse the web to find a URL to the company's website and come up with your best description on what this company does.
+    """
+    data_basic_info = supplier_obtain_esg_data(label="Basic Information", task=task_basic_info, response_format=AgentSupplier)
 
-    task_scope_1 = task_prefix + "\nPlease any data on THEIR OWN scope 1 emissions calculations."
-    data_scope_1 = supplier_obtain_esg_data(label="Scope 1 Emissions", task=task_scope_1)
+    task_scope_1 = task_prefix + """
+    \nPlease find any data on THEIR OWN scope 1 emissions calculations.
+    Scope 1 emissions are direct emissions from sources owned or controlled by a company.
+    These include things like: on-site energy, fleet vehicles, process emissions, or accidental emissions.
+    ONLY INCLUDE EXPLICIT MENTIONS OF "SCOPE 1" DATA.
+    """
+    data_scope_1 = supplier_obtain_esg_data(label="Scope 1 Emissions", task=task_scope_1, response_format=DataSummary)
     esg_score += 1 if data_scope_1.available else 0
 
-    task_scope_2 = task_prefix + "\nPlease any data on THEIR OWN scope 2 emissions calculations."
-    data_scope_2 = supplier_obtain_esg_data(label="Scope 2 Emissions", task=task_scope_2)
+    task_scope_2 = task_prefix + f"""
+    Please find any data on THEIR OWN scope 2 emissions calculations.
+    Scope 2 emissions are indirect greenhouse gas (GHG) emissions that result from the generation of energy that an organization purchases and uses.
+    These include things like the purchase of electricity from: steam, heat, cooling, etc.
+    ONLY INCLUDE EXPLICIT MENTIONS OF "SCOPE 2" DATA.
+    """
+    data_scope_2 = supplier_obtain_esg_data(label="Scope 2 Emissions", task=task_scope_2, response_format=DataSummary)
     esg_score += 1 if data_scope_2.available else 0
 
-    task_scope_3 = task_prefix + "\nPlease any data on THEIR OWN scope 3 emissions calculations."
-    data_scope_3 = supplier_obtain_esg_data(label="Scope 3 Emissions", task=task_scope_3)
+    task_scope_3 = task_prefix + """
+    Please find any data on THEIR OWN scope 3 emissions calculations.
+    Scope 3 emissions are greenhouse gas (GHG) emissions that are a result of activities that a company indirectly affects as part of its value chain, but that are not owned or controlled by the company.
+    These include things like: supply chain emissions, use of sold products, waste disposal, employee travel, contracted waste disposal, etc.
+    ONLY INCLUDE EXPLICIT MENTIONS OF "SCOPE 3" DATA.
+    """
+    data_scope_3 = supplier_obtain_esg_data(label="Scope 3 Emissions", task=task_scope_3, response_format=DataSummary)
     esg_score += 1 if data_scope_3.available else 0
 
     task_ecovadis = task_prefix + "\nPlease find if this company has a publicly available Ecovadis score."
-    data_ecovadis = supplier_obtain_esg_data(label="Ecovadis Score", task=task_ecovadis)
+    data_ecovadis = supplier_obtain_esg_data(label="Ecovadis Score", task=task_ecovadis, response_format=DataSummary)
     esg_score += 1 if data_ecovadis.available else 0
 
     task_iso_14001 = task_prefix + "\nPlease find if this company has an ISO 14001 certification."
-    data_iso_14001 = supplier_obtain_esg_data(label="ISO 14001 Certification", task=task_iso_14001)
+    data_iso_14001 = supplier_obtain_esg_data(label="ISO 14001 Certification", task=task_iso_14001, response_format=DataSummary)
     esg_score += 1 if data_iso_14001.available else 0
 
     task_product_lca = task_prefix + "\nPlease find if this company has any products undergoing a Life Cycle Assessment, or LCA."
-    data_product_lca = supplier_obtain_esg_data(label="Product LCAs", task=task_product_lca)
+    data_product_lca = supplier_obtain_esg_data(label="Product LCAs", task=task_product_lca, response_format=DataSummary)
     esg_score += 1 if data_product_lca.available else 0
 
     if esg_score <= 2:
@@ -82,7 +107,7 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
             iso_14001=data_iso_14001,
             product_lca=data_product_lca,
             segment=segment,
-            updated=date.today(),
+            updated=datetime.now(pytz.timezone('Europe/London')),
         )
     )
     st.session_state["suppliers_data"].append(processed_supplier)
@@ -102,8 +127,8 @@ def add_dialog():
     with st.form(key="supplier_form", border=False):
         # Input fields for the supplier details
         name = st.text_input(label="Company Name:red[*]", help="Required field.")
-        website = st.text_input(label="Website")
-        description = st.text_area(label="Description")
+        website = st.text_input(label="Website", help="If empty, will be auto-populated using AI.")
+        description = st.text_area(label="Description", help="If empty, will be auto-populated using AI.")
         notes = st.text_area(label="Notes")
         
         # Submit button

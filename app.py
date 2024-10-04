@@ -58,7 +58,7 @@ if "suppliers_data" not in st.session_state:
 # Main app function
 if __name__=="__main__":
     st.set_page_config(page_title="Composite.ai", page_icon="♻️")
-    st.session_state["suppliers_data"] = sorted(suppliers_data, key=lambda supplier: supplier.name)
+    st.session_state["suppliers_data"] = sorted(st.session_state["suppliers_data"], key=lambda supplier: supplier.name)
 
     chat_suppliers()
 

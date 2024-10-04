@@ -40,7 +40,6 @@ class Agent(BaseAgent):
     _memory_curr_execution: List[DriverMessage] = PrivateAttr(default=[])
     _next_step: NextStep = PrivateAttr(default=NextStep.PLAN)
     _num_curr_iterations: int = PrivateAttr(default=0)
-    _output_format: BaseModel | None = PrivateAttr(default=None)
 
 
     def __init__(self, **data):
@@ -218,10 +217,11 @@ class Agent(BaseAgent):
             driver_input = DriverInput(
                 messages=self._memory_chat + self._memory_curr_execution,
                 temperature=0.0,
+                response_format=self.response_format,
             )
             agent_response = self.driver.generate(input=driver_input).content
         
-        self._memory_chat.append(AssistantMessage(role="assistant", content=agent_response))
+        self._memory_chat.append(AssistantMessage(role="assistant", content=str(agent_response)))
 
         # Remove earliest two chat messages (skipping system prompt) if more than 10 in memory
         if len(self._memory_chat) >= 10:
