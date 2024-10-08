@@ -6,47 +6,13 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
-from agent import Agent
+from utils.agent import Agent
+from utils.db import db
+from utils.supplier_data import Supplier, DataSummary
+from components.chat import chat_suppliers
 from compositeai.tools import GoogleSerperApiTool, WebScrapeTool
 from compositeai.drivers import OpenAIDriver
 from compositeai.agents import AgentResult
-
-
-class Source(BaseModel):
-    key_quote: str
-    link: str
-
-
-class DataSummary(BaseModel):
-    available: bool
-    summary: str
-    sources: List[Source]
-
-
-class ESGData(BaseModel):
-    scope_1: DataSummary
-    scope_2: DataSummary
-    scope_3: DataSummary
-    ecovadis: DataSummary
-    iso_14001: DataSummary
-    product_lca: DataSummary
-    segment: str
-    updated: datetime
-
-
-class Supplier(BaseModel):
-    id: str
-    name: str
-    website: Optional[str] = None
-    description: Optional[str] = None
-    notes: Optional[str] = None
-    esg: ESGData
-
-
-class AgentSupplier(BaseModel):
-    name: str
-    website: Optional[str] = None
-    description: Optional[str] = None
 
 
 # HELPER COMPONENT
@@ -93,11 +59,7 @@ def delete_dialog(supplier: Supplier):
     with col1:
         if st.button(label="Confirm", type="primary"):
             supplier_id = supplier.id
-            num_suppliers = len(st.session_state["suppliers_data"])
-            for i in range(num_suppliers):
-                if supplier_id == st.session_state["suppliers_data"][i].id:
-                    st.session_state["suppliers_data"].pop(i)
-                    break
+            db.delete_supplier(supplier_id=supplier_id, org_id="aeh6JBvXAkrbuDVaGQkG")
             st.rerun()
     with col2:
         if st.button(label="Cancel"):
@@ -229,6 +191,7 @@ def update_dialog(supplier: Supplier):
     supplier.esg.product_lca = data_product_lca
     supplier.esg.segment = segment
     supplier.esg.updated = datetime.now(pytz.timezone('Europe/London'))
+    db.update_supplier(supplier=supplier, org_id="aeh6JBvXAkrbuDVaGQkG")
     st.success(body=f"Successfully updated ESG data for {supplier.name}!")
     time.sleep(2)
     st.rerun()
@@ -237,6 +200,9 @@ def update_dialog(supplier: Supplier):
 # PAGE
 # Display supplier data and editing forms
 def supplier_details():
+    # Chat assistant sidebar
+    chat_suppliers()
+
     # Retrieve supplier data class and display name as title
     supplier = st.session_state["page"]["data"]["supplier"]
     st.title(body=f"**{supplier.name}**", anchor=False)
@@ -290,232 +256,232 @@ def supplier_details():
         update_dialog(supplier=supplier)
 
 
-# Initial supplier data
-suppliers_data = [
-    Supplier(
-        id=str(uuid.uuid4()),
-        name="Honeywell",
-        website="https://www.honeywell.com/us/en",
-        description="Go-to brand for research chemicals.",
-        esg=ESGData(
-            scope_1=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            scope_2=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            scope_3=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            ecovadis=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            iso_14001=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            product_lca=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            segment="High",
-            updated=datetime.now(pytz.timezone('Europe/London')),
-        )
-    ),
-    Supplier(
-        id=str(uuid.uuid4()),
-        name="3M",
-        website="https://www.3m.com/",
-        description="3M Company is an American multinational conglomerate operating in the fields of industry, worker safety, healthcare, and consumer goods.",
-        esg=ESGData(
-            scope_1=DataSummary(
-                available=True,
-                summary="3M has been calculating its Scope 1 and Scope 2 greenhouse gas (GHG) emissions annually since 2002. The company has achieved a 68.1% reduction in these emissions while expanding its business. Scope 1 emissions include all direct emissions from sources owned or controlled by 3M, such as facilities and vehicles. The company aims to further reduce its Scope 1 and 2 emissions by at least 50% by 2030, 80% by 2040, and achieve carbon neutrality by 2050.",
-                sources=[
-                    Source(
-                        key_quote="Since 2002, 3M’s EHS (Environment, Health and Safety) Laboratory has calculated the company’s Scope 1 and Scope 2 emissions on an annual basis, and 3M has reduced its overall Scope 1 and 2 emissions by 68.1% while growing our business.", 
-                        link="https://news.3m.com/Taking-inventory-of-greenhouse-gas-emissions",
-                    ),
-                    Source(
-                        key_quote="To achieve carbon neutrality by 2050, 3M aims to reduce Scope 1 and Scope 2 market-based GHG emissions by at least 50% by 2030.", 
-                        link="https://multimedia.3m.com/mws/media/2391591O/pdf-document-to-describe-3ms-carbon-reduction-plan-for-uk.pdf",
-                    ),
-                ]
-            ),
-            scope_2=DataSummary(
-                available=True,
-                summary="3M has committed to reducing its Scope 2 emissions by at least 50% from a 2019 baseline by 2030, and aims for carbon neutrality in its operations by 2050. The company calculates its Scope 2 emissions annually through its Environment, Health and Safety (EHS) Laboratory, which has been doing so since 2002. The latest reports indicate a significant reduction in greenhouse gas emissions, with a 43.2% reduction since 2019.",
-                sources=[
-                    Source(
-                        key_quote="We are committed to reduce Scope 1 and 2 market-based GHG emissions from our 2019 baseline by at least 50% by 2030.", 
-                        link="https://multimedia.3m.com/mws/media/2300331O/na.pdf",
-                    ),
-                    Source(
-                        key_quote="Since 2002, 3M's EHS Laboratory has calculated the company's Scope 1 and Scope 2 emissions on an annual basis.", 
-                        link="https://news.3m.com/Taking-inventory-of-greenhouse-gas-emissions",
-                    ),
-                    Source(
-                        key_quote="To achieve carbon neutrality by 2050, 3M aims to reduce Scope 1 and Scope 2 market-based GHG emissions by at least 50% by 2030.", 
-                        link="https://multimedia.3m.com/mws/media/2391591O/pdf-document-to-describe-3ms-carbon-reduction-plan-for-uk.pdf",
-                    ),
-                ]
-            ),
-            scope_3=DataSummary(
-                available=True,
-                summary="3M has explicitly mentioned their Scope 3 emissions calculations in several sources. They aim to reduce absolute Scope 3 emissions by 42% by 2030 from a 2021 baseline. In 2021, their Scope 3 emissions were reported to be 11,900,000 metric tons (CO2e), covering categories 1-9. They have also engaged in initiatives to calculate and manage these emissions as part of their sustainability goals.",
-                sources=[
-                    Source(
-                        key_quote="Reduce absolute scope 3 emissions by 42% by 2030 from a 2021 baseline.", 
-                        link="https://news.3m.com/2024-10-03-3M-achieves-Science-Based-Targets-initiative-validation,-strengthening-commitment-to-decarbonization-and-customer-innovation",
-                    ),
-                    Source(
-                        key_quote="The Scope 3 emissions for 2021 are 11,900,000 metric tons (CO2e) and include categories 1-9.", 
-                        link="https://multimedia.3m.com/mws/media/2300331O/na.pdf",
-                    ),
-                    Source(
-                        key_quote="Scope 3 emissions are all indirect emissions that occur in the value chain of the reporting company, including both upstream and downstream emissions.", 
-                        link="https://multimedia.3m.com/mws/media/1261344O/bonding-tapes-sustainability-flyer-hires.pdf",
-                    ),
-                ]
-            ),
-            ecovadis=DataSummary(
-                available=True,
-                summary="3M has received a Gold Recognition Level from EcoVadis, indicating that it is in the 98th percentile of suppliers assessed for sustainability and corporate social responsibility.",
-                sources=[
-                    Source(
-                        key_quote="EcoVadis awarded 3M a Gold Recognition Level for achievements in the 98th percentile of suppliers assessed in 2021.", 
-                        link="https://multimedia.3m.com/mws/media/2030547O/3mtm-2021-nordic-sustainability-report.pdf",
-                    ),
-                    Source(
-                        key_quote="3M earned a perfect score of 100% and, along with it, the Gold Recognition Level from EcoVadis.", 
-                        link="https://multimedia.3m.com/mws/media/1836747O/2020-sustainability-report.pdf",
-                    ),
-                ]
-            ),
-            iso_14001=DataSummary(
-                available=True,
-                summary="3M has ISO 14001 certification, confirming their compliance with international standards for environmental management systems.",
-                sources=[
-                    Source(
-                        key_quote="ISO 14001:2015 certification for 3M Company.", 
-                        link="https://www.dqsglobal.com/intl/customer-database/3m-company11",
-                    ),
-                    Source(
-                        key_quote="Proof has been furnished by means of an audit that the requirements of ISO 14001:2015 are met.", 
-                        link="https://multimedia.3m.com/mws/media/1563980O/180328-tuv-certificate-14001-en.PDF",
-                    ),
-                    Source(
-                        key_quote="Every 3M Automotive OEM manufacturing facility has certifications in ISO 14001 for environmental systems.", 
-                        link="https://www.3m.co.id/3M/en_ID/oem-tier-id/resources/certifications-and-regulatory/",
-                    ),
-                ]
-            ),
-            product_lca=DataSummary(
-                available=True,
-                summary="3M conducts Life Cycle Assessments (LCA) for select products as part of their sustainability initiatives. They utilize LCA to evaluate the environmental impacts of their products throughout their life cycle, which is integrated into their Life Cycle Management (LCM) process.",
-                sources=[
-                    Source(
-                        key_quote="3M follows a Life Cycle Management (LCM) process to identify environmental, health and safety opportunities, manage risks and ensure regulatory compliance.", 
-                        link="https://transformationalcompany.ca/case-study/3m-utilizes-life-cycle-assessment-lca-to-influence-value-chain/",
-                    ),
-                    Source(
-                        key_quote="The LCM system applies to all 3M products. In addition, for select products we conduct Life Cycle Assessments (LCAs), Environmental Product.", 
-                        link="https://multimedia.3m.com/mws/media/2292786O/3m-2023-global-impact-report.pdf",
-                    ),
-                    Source(
-                        key_quote="3M has long taken a life cycle thinking approach and carry out analysis on products to help us understand their environmental impact.", 
-                        link="https://www.linkedin.com/pulse/how-3m-combines-innovation-sustainability-romy-kenyon",
-                    ),
-                ]
-            ),
-            segment="High",
-            updated=datetime.now(pytz.timezone('Europe/London')),
-        )
-    ),
-    Supplier(
-        id=str(uuid.uuid4()),
-        name="Azenta Life Sciences",
-        website="https://www.azenta.com/",
-        description="Azenta Life Sciences stands as a prominent provider of state-of-the-art laboratory solutions, granting access to esteemed brands including Biocision, FluidX, Ziath, FreezerPro, and 4titude.",
-        esg=ESGData(
-            scope_1=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            scope_2=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            scope_3=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            ecovadis=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            iso_14001=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            product_lca=DataSummary(
-                available=True,
-                summary="Testing testing testing.",
-                sources=[
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                    Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
-                ]
-            ),
-            segment="High",
-            updated=datetime.now(pytz.timezone('Europe/London')),
-        )
-    )
-]
+# # Initial supplier data
+# suppliers_data = [
+#     Supplier(
+#         id=str(uuid.uuid4()),
+#         name="Honeywell",
+#         website="https://www.honeywell.com/us/en",
+#         description="Go-to brand for research chemicals.",
+#         esg=ESGData(
+#             scope_1=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             scope_2=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             scope_3=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             ecovadis=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             iso_14001=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             product_lca=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             segment="High",
+#             updated=datetime.now(pytz.timezone('Europe/London')),
+#         )
+#     ),
+#     Supplier(
+#         id=str(uuid.uuid4()),
+#         name="3M",
+#         website="https://www.3m.com/",
+#         description="3M Company is an American multinational conglomerate operating in the fields of industry, worker safety, healthcare, and consumer goods.",
+#         esg=ESGData(
+#             scope_1=DataSummary(
+#                 available=True,
+#                 summary="3M has been calculating its Scope 1 and Scope 2 greenhouse gas (GHG) emissions annually since 2002. The company has achieved a 68.1% reduction in these emissions while expanding its business. Scope 1 emissions include all direct emissions from sources owned or controlled by 3M, such as facilities and vehicles. The company aims to further reduce its Scope 1 and 2 emissions by at least 50% by 2030, 80% by 2040, and achieve carbon neutrality by 2050.",
+#                 sources=[
+#                     Source(
+#                         key_quote="Since 2002, 3M’s EHS (Environment, Health and Safety) Laboratory has calculated the company’s Scope 1 and Scope 2 emissions on an annual basis, and 3M has reduced its overall Scope 1 and 2 emissions by 68.1% while growing our business.", 
+#                         link="https://news.3m.com/Taking-inventory-of-greenhouse-gas-emissions",
+#                     ),
+#                     Source(
+#                         key_quote="To achieve carbon neutrality by 2050, 3M aims to reduce Scope 1 and Scope 2 market-based GHG emissions by at least 50% by 2030.", 
+#                         link="https://multimedia.3m.com/mws/media/2391591O/pdf-document-to-describe-3ms-carbon-reduction-plan-for-uk.pdf",
+#                     ),
+#                 ]
+#             ),
+#             scope_2=DataSummary(
+#                 available=True,
+#                 summary="3M has committed to reducing its Scope 2 emissions by at least 50% from a 2019 baseline by 2030, and aims for carbon neutrality in its operations by 2050. The company calculates its Scope 2 emissions annually through its Environment, Health and Safety (EHS) Laboratory, which has been doing so since 2002. The latest reports indicate a significant reduction in greenhouse gas emissions, with a 43.2% reduction since 2019.",
+#                 sources=[
+#                     Source(
+#                         key_quote="We are committed to reduce Scope 1 and 2 market-based GHG emissions from our 2019 baseline by at least 50% by 2030.", 
+#                         link="https://multimedia.3m.com/mws/media/2300331O/na.pdf",
+#                     ),
+#                     Source(
+#                         key_quote="Since 2002, 3M's EHS Laboratory has calculated the company's Scope 1 and Scope 2 emissions on an annual basis.", 
+#                         link="https://news.3m.com/Taking-inventory-of-greenhouse-gas-emissions",
+#                     ),
+#                     Source(
+#                         key_quote="To achieve carbon neutrality by 2050, 3M aims to reduce Scope 1 and Scope 2 market-based GHG emissions by at least 50% by 2030.", 
+#                         link="https://multimedia.3m.com/mws/media/2391591O/pdf-document-to-describe-3ms-carbon-reduction-plan-for-uk.pdf",
+#                     ),
+#                 ]
+#             ),
+#             scope_3=DataSummary(
+#                 available=True,
+#                 summary="3M has explicitly mentioned their Scope 3 emissions calculations in several sources. They aim to reduce absolute Scope 3 emissions by 42% by 2030 from a 2021 baseline. In 2021, their Scope 3 emissions were reported to be 11,900,000 metric tons (CO2e), covering categories 1-9. They have also engaged in initiatives to calculate and manage these emissions as part of their sustainability goals.",
+#                 sources=[
+#                     Source(
+#                         key_quote="Reduce absolute scope 3 emissions by 42% by 2030 from a 2021 baseline.", 
+#                         link="https://news.3m.com/2024-10-03-3M-achieves-Science-Based-Targets-initiative-validation,-strengthening-commitment-to-decarbonization-and-customer-innovation",
+#                     ),
+#                     Source(
+#                         key_quote="The Scope 3 emissions for 2021 are 11,900,000 metric tons (CO2e) and include categories 1-9.", 
+#                         link="https://multimedia.3m.com/mws/media/2300331O/na.pdf",
+#                     ),
+#                     Source(
+#                         key_quote="Scope 3 emissions are all indirect emissions that occur in the value chain of the reporting company, including both upstream and downstream emissions.", 
+#                         link="https://multimedia.3m.com/mws/media/1261344O/bonding-tapes-sustainability-flyer-hires.pdf",
+#                     ),
+#                 ]
+#             ),
+#             ecovadis=DataSummary(
+#                 available=True,
+#                 summary="3M has received a Gold Recognition Level from EcoVadis, indicating that it is in the 98th percentile of suppliers assessed for sustainability and corporate social responsibility.",
+#                 sources=[
+#                     Source(
+#                         key_quote="EcoVadis awarded 3M a Gold Recognition Level for achievements in the 98th percentile of suppliers assessed in 2021.", 
+#                         link="https://multimedia.3m.com/mws/media/2030547O/3mtm-2021-nordic-sustainability-report.pdf",
+#                     ),
+#                     Source(
+#                         key_quote="3M earned a perfect score of 100% and, along with it, the Gold Recognition Level from EcoVadis.", 
+#                         link="https://multimedia.3m.com/mws/media/1836747O/2020-sustainability-report.pdf",
+#                     ),
+#                 ]
+#             ),
+#             iso_14001=DataSummary(
+#                 available=True,
+#                 summary="3M has ISO 14001 certification, confirming their compliance with international standards for environmental management systems.",
+#                 sources=[
+#                     Source(
+#                         key_quote="ISO 14001:2015 certification for 3M Company.", 
+#                         link="https://www.dqsglobal.com/intl/customer-database/3m-company11",
+#                     ),
+#                     Source(
+#                         key_quote="Proof has been furnished by means of an audit that the requirements of ISO 14001:2015 are met.", 
+#                         link="https://multimedia.3m.com/mws/media/1563980O/180328-tuv-certificate-14001-en.PDF",
+#                     ),
+#                     Source(
+#                         key_quote="Every 3M Automotive OEM manufacturing facility has certifications in ISO 14001 for environmental systems.", 
+#                         link="https://www.3m.co.id/3M/en_ID/oem-tier-id/resources/certifications-and-regulatory/",
+#                     ),
+#                 ]
+#             ),
+#             product_lca=DataSummary(
+#                 available=True,
+#                 summary="3M conducts Life Cycle Assessments (LCA) for select products as part of their sustainability initiatives. They utilize LCA to evaluate the environmental impacts of their products throughout their life cycle, which is integrated into their Life Cycle Management (LCM) process.",
+#                 sources=[
+#                     Source(
+#                         key_quote="3M follows a Life Cycle Management (LCM) process to identify environmental, health and safety opportunities, manage risks and ensure regulatory compliance.", 
+#                         link="https://transformationalcompany.ca/case-study/3m-utilizes-life-cycle-assessment-lca-to-influence-value-chain/",
+#                     ),
+#                     Source(
+#                         key_quote="The LCM system applies to all 3M products. In addition, for select products we conduct Life Cycle Assessments (LCAs), Environmental Product.", 
+#                         link="https://multimedia.3m.com/mws/media/2292786O/3m-2023-global-impact-report.pdf",
+#                     ),
+#                     Source(
+#                         key_quote="3M has long taken a life cycle thinking approach and carry out analysis on products to help us understand their environmental impact.", 
+#                         link="https://www.linkedin.com/pulse/how-3m-combines-innovation-sustainability-romy-kenyon",
+#                     ),
+#                 ]
+#             ),
+#             segment="High",
+#             updated=datetime.now(pytz.timezone('Europe/London')),
+#         )
+#     ),
+#     Supplier(
+#         id=str(uuid.uuid4()),
+#         name="Azenta Life Sciences",
+#         website="https://www.azenta.com/",
+#         description="Azenta Life Sciences stands as a prominent provider of state-of-the-art laboratory solutions, granting access to esteemed brands including Biocision, FluidX, Ziath, FreezerPro, and 4titude.",
+#         esg=ESGData(
+#             scope_1=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             scope_2=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             scope_3=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             ecovadis=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             iso_14001=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             product_lca=DataSummary(
+#                 available=True,
+#                 summary="Testing testing testing.",
+#                 sources=[
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                     Source(key_quote="Testing testing.", link="https://www.composite-corp.com/"),
+#                 ]
+#             ),
+#             segment="High",
+#             updated=datetime.now(pytz.timezone('Europe/London')),
+#         )
+#     )
+# ]

@@ -5,9 +5,13 @@ from datetime import datetime
 import pytz
 from fuzzywuzzy import fuzz, process
 from typing import List
+from components.chat import chat_suppliers
 from components.supplier import (
     supplier_display, 
     supplier_obtain_esg_data, 
+)
+from utils.db import db
+from utils.supplier_data import (
     Supplier, 
     ESGData,
     DataSummary,
@@ -110,7 +114,8 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
             updated=datetime.now(pytz.timezone('Europe/London')),
         )
     )
-    st.session_state["suppliers_data"].append(processed_supplier)
+    # st.session_state["suppliers_data"].append(processed_supplier)
+    db.insert_supplier(supplier=processed_supplier, org_id="aeh6JBvXAkrbuDVaGQkG")
     st.session_state["page"] = {
         "name": "Supplier Details", 
         "data": {
@@ -162,7 +167,8 @@ def add_dialog():
 
 def home_page():
     # Get suppliers data from session state
-    suppliers_data = st.session_state["suppliers_data"]
+    suppliers_data = db.get_org_suppliers(org_id="aeh6JBvXAkrbuDVaGQkG")
+    suppliers_data = sorted(suppliers_data, key=lambda supplier: supplier.name)
 
     # Check if in the middle of processing supplier
     if st.session_state["page"]["data"]["processing_supplier"]:
@@ -173,6 +179,9 @@ def home_page():
             description=add_supplier["description"],
             notes=add_supplier["notes"],
         )
+
+    # Chat assistant sidebar
+    chat_suppliers()
 
     # Title of page
     st.header("ESG Supplier Management System", anchor=False)

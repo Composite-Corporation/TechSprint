@@ -2,6 +2,8 @@ import streamlit as st
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from compositeai.agents import AgentResult
+from utils.auth import auth
+
 
 
 # Class for storing chat message data
@@ -26,6 +28,55 @@ def chat_bubble(chat: ChatMessage):
                     st.markdown(item)
 
 
+def confirm_delete_account(user_id: str, email: str):
+
+    st.markdown("Are you sure? This action cannot be undone. You will lose access to your organization.")
+    col1, col2 = st.columns([0.25, 1])
+
+    with col1:
+        if st.button(label="Confirm", type="primary"):
+            # Attempt user account deletion
+            status, message = auth.delete_user(user_id)
+            print(status)
+
+            if status:
+                # Display deletion confirmation
+                st.success(message)
+
+                # Upon log out, clear entire session state
+                st.session_state["page"] = {
+                    "name": "Auth",
+                    "data": None,
+                }
+
+                ## Log event
+                #log.account_deletion_event(user_id=user_id, email=email)
+            else:
+                # Otherwise, display error messeage
+                st.error(message)
+
+            # Rerun app regardless
+            st.rerun()
+    with col2:
+        if st.button(label="Cancel"):
+            st.rerun()
+
+
+@st.dialog(title="User Settings")
+def user_settings_dialog():
+    if st.button(label="Sign Out", use_container_width=True):
+        st.session_state["page"] = {
+            "name": "Auth",
+            "data": None,
+        }
+        st.rerun()
+    if st.button(label="Delete Account", type="primary", use_container_width=True):
+        # Retrieve account info
+        uid = st.session_state["page"]["data"]["session_data"]["localId"]
+        email = st.session_state["page"]["data"]["session_data"]["email"]
+        confirm_delete_account(user_id=uid, email=email)
+
+
 # Chat widget for supplier details page
 def chat_suppliers():
     # Retrieve agent from session state
@@ -33,9 +84,16 @@ def chat_suppliers():
 
     # Setup sidebar chat
     with st.sidebar:
-        # Display CompositeAI logo and sidebar title
+        # Display CompositeAI logo
         st.image("static/composite.png", output_format="PNG", width=300)
-        st.title("**AI Assistant**")
+
+        # Display sidebar title and user settings button
+        col1, col2 = st.columns([0.8, 0.2])
+        with col1:
+            st.write("## **AI Assistant**")
+        with col2:
+            if st.button(label=":material/person:", use_container_width=True):
+                user_settings_dialog()
 
         # Container of chat messages
         chat_container = st.container(height=450)

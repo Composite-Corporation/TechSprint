@@ -1,12 +1,11 @@
 import streamlit as st
 from dotenv import load_dotenv
 
-from agent import Agent
+from utils.agent import Agent
 from components import (
-    chat_suppliers,
+    authenticate,
     home_page,
     supplier_details,
-    suppliers_data,
 )
 from compositeai.tools import GoogleSerperApiTool, WebScrapeTool
 from compositeai.drivers import OpenAIDriver
@@ -46,23 +45,20 @@ if "chat_history" not in st.session_state:
     st.session_state["chat_history"] = []
 if "page" not in st.session_state:
     st.session_state["page"] = {
-        "name": "Home",
-        "data": {
-            "processing_supplier": False,
-        },
+        "name": "Auth",
+        "data": None,
     }
-if "suppliers_data" not in st.session_state:
-    st.session_state["suppliers_data"] = suppliers_data
 
 
 # Main app function
 if __name__=="__main__":
     st.set_page_config(page_title="Composite.ai", page_icon="♻️")
-    st.session_state["suppliers_data"] = sorted(st.session_state["suppliers_data"], key=lambda supplier: supplier.name)
 
-    chat_suppliers()
-
-    if st.session_state["page"]["name"] == "Home":
+    if st.session_state["page"]["name"] == "Auth":
+        authenticate()
+    elif st.session_state["page"]["name"] == "Home":
         home_page()
     elif st.session_state["page"]["name"] == "Supplier Details":
         supplier_details()
+    else:
+        st.error(body="Page Not Found.")
