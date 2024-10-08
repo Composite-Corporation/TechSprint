@@ -59,8 +59,8 @@ def authenticate():
         if st.button("Sign Up"):
             if password != confirm_password:
                 st.error("Passwords must match.")
-            # elif "@college.harvard.edu" not in email and "@scientific-labs.com" not in email:
-            #     st.error("Your are not authorized to join this organization.")
+            elif "@college.harvard.edu" not in email and "@scientific-labs.com" not in email:
+                st.error("Your are not authorized to join this organization.")
             else:
                 session_data, message = auth.sign_up(email, password)
                 if session_data:
