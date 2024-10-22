@@ -7,7 +7,7 @@ import os
 
 # from utils.log import Log
 from utils.auth import auth
-# from utils.db import DB
+from utils.db import db
 import streamlit as st
 
 # db = DB()
@@ -31,6 +31,9 @@ def authenticate():
         if st.button("Sign In"):
             session_data, message = auth.sign_in(email, password)
             if session_data:
+                user_data = db.get_user(uid=session_data["localId"])
+                user_org_id = user_data["org_id"]
+                session_data["org_id"] = user_org_id
                 st.session_state["page"] = {
                     "name": "Home",
                     "data": {
@@ -39,7 +42,6 @@ def authenticate():
                     },
                 }
                 st.success(message)
-                # log.login_event(user_id=session["localId"], email=email)
                 st.rerun()
             else:
                 st.error(message)
@@ -49,34 +51,58 @@ def authenticate():
         email = st.text_input("Email", key="signup_email")
         password = st.text_input("Password", type="password", key="signup_password")
         confirm_password = st.text_input("Confirm Password", type="password", key="confirm_password")
-        st.selectbox(
+        org_name = st.selectbox(
             label="Join Organization",
-            options=("Scientific Laboratory Supplies (SLS) Ltd."),
+            options=(
+                "Scientific Laboratory Supplies (SLS) Ltd.",
+                "Evonik Industries",
+                "Arteco Coolants",
+            ),
             index=0,
-            disabled=True,
         )
         
         if st.button("Sign Up"):
             if password != confirm_password:
                 st.error("Passwords must match.")
-            elif "@college.harvard.edu" not in email and "@scientific-labs.com" not in email:
+                return
+            
+            org_id = None
+            org_error = False
+            if "@college.harvard.edu" in email:
+                org_id = "aeh6JBvXAkrbuDVaGQkG"
+                org_error = org_name != "Scientific Laboratory Supplies (SLS) Ltd."
+            elif "@scientific-labs.com" in email:
+                org_id = "aeh6JBvXAkrbuDVaGQkG"
+                org_error = org_name != "Scientific Laboratory Supplies (SLS) Ltd."
+            elif "@evonik.com" in email:
+                org_id = "YFFNUqZ8WFt4DLQ9FwvP"
+                org_error = org_name != "Evonik Industries"
+            elif "@arteco-coolants.com" in email:
+                org_id = "s41UQTwtMZsueu5K3MZS"
+                org_error = org_name != "Arteco Coolants"
+
+            if org_id is None:
+                st.error("Unrecognized organization.")
+                return
+            if org_error:
                 st.error("Your are not authorized to join this organization.")
+                return
+            
+            session_data, message = auth.sign_up(email, password)
+            if session_data:
+                session_data["org_id"] = org_id
+                st.session_state["page"] = {
+                    "name": "Home",
+                    "data": {
+                        "processing_supplier": False,
+                        "session_data": session_data,
+                    },
+                }
+                st.success(message)
+                db.create_user(uid=session_data["localId"], org_id=org_id)
+                st.rerun()
             else:
-                session_data, message = auth.sign_up(email, password)
-                if session_data:
-                    st.session_state["page"] = {
-                        "name": "Home",
-                        "data": {
-                            "processing_supplier": False,
-                            "session_data": session_data,
-                        },
-                    }
-                    st.success(message)
-                    # log.account_creation_event(user_id=session["localId"], email=email)
-                    # db.create_user(uid=session["localId"])
-                    st.rerun()
-                else:
-                    st.error(message)
+                st.error(message)
         
     with tab3:
         st.write("**Reset Your Password**")

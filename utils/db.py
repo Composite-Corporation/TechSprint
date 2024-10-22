@@ -49,10 +49,19 @@ class DB():
         firebase_admin.initialize_app(credential=creds)
 
 
-    # def create_user(self, uid: str) -> None:
-    #     self.client.collection("users").document(uid).set({
-    #         "timestamp": firestore.SERVER_TIMESTAMP,
-    #     })
+    def create_user(self, uid: str, org_id: str) -> None:
+        self.client.collection("users").document(uid).set({
+            "timestamp": firestore.SERVER_TIMESTAMP,
+            "org_id": org_id,
+        })
+        
+
+    def get_user(self, uid: str) -> Optional[dict]:
+        doc_ref = self.client.collection("users").document(uid)
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+        return None
 
 
     def insert_supplier(
@@ -134,4 +143,3 @@ class DB():
         return supplier_list
 
 db = DB()
-    

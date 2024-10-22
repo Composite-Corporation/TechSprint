@@ -59,7 +59,8 @@ def delete_dialog(supplier: Supplier):
     with col1:
         if st.button(label="Confirm", type="primary"):
             supplier_id = supplier.id
-            db.delete_supplier(supplier_id=supplier_id, org_id="aeh6JBvXAkrbuDVaGQkG")
+            org_id = st.session_state["page"]["data"]["session_data"]["org_id"]
+            db.delete_supplier(supplier_id=supplier_id, org_id=org_id)
             st.rerun()
     with col2:
         if st.button(label="Cancel"):
@@ -84,6 +85,7 @@ def supplier_display(supplier: Supplier):
                 "name": "Supplier Details", 
                 "data": {
                     "supplier": supplier,
+                    "session_data": st.session_state["page"]["data"]["session_data"],
                 },
             }
             st.rerun()
@@ -191,7 +193,8 @@ def update_dialog(supplier: Supplier):
     supplier.esg.product_lca = data_product_lca
     supplier.esg.segment = segment
     supplier.esg.updated = datetime.now(pytz.timezone('Europe/London'))
-    db.update_supplier(supplier=supplier, org_id="aeh6JBvXAkrbuDVaGQkG")
+    org_id = st.session_state["page"]["data"]["session_data"]["org_id"]
+    db.update_supplier(supplier=supplier, org_id=org_id)
     st.success(body=f"Successfully updated ESG data for {supplier.name}!")
     time.sleep(2)
     st.rerun()
@@ -217,6 +220,7 @@ def supplier_details():
                 "name": "Home", 
                 "data": {
                     "processing_supplier": False,
+                    "session_data": st.session_state["page"]["data"]["session_data"],
                 },
             }
             st.rerun()

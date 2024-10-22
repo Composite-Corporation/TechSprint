@@ -114,12 +114,13 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
             updated=datetime.now(pytz.timezone('Europe/London')),
         )
     )
-    # st.session_state["suppliers_data"].append(processed_supplier)
-    db.insert_supplier(supplier=processed_supplier, org_id="aeh6JBvXAkrbuDVaGQkG")
+    org_id = st.session_state["page"]["data"]["session_data"]["org_id"]
+    db.insert_supplier(supplier=processed_supplier, org_id=org_id)
     st.session_state["page"] = {
         "name": "Supplier Details", 
         "data": {
             "supplier": processed_supplier,
+            "session_data": st.session_state["page"]["data"]["session_data"],
         },
     }
     st.success(body=f"Successfully added {name} as a supplier!")
@@ -166,8 +167,11 @@ def add_dialog():
 
 
 def home_page():
+    # Get org id from session state
+    org_id = st.session_state["page"]["data"]["session_data"]["org_id"]
+
     # Get suppliers data from session state
-    suppliers_data = db.get_org_suppliers(org_id="aeh6JBvXAkrbuDVaGQkG")
+    suppliers_data = db.get_org_suppliers(org_id=org_id)
     suppliers_data = sorted(suppliers_data, key=lambda supplier: supplier.name)
 
     # Check if in the middle of processing supplier
