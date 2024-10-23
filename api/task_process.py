@@ -1,21 +1,20 @@
 # main.py
 
 from fastapi import FastAPI, HTTPException
-import asyncio
-from utils.agent import Agent
-from compositeai.tools import GoogleSerperApiTool, WebScrapeTool
-from compositeai.drivers import OpenAIDriver
-import json
 from google.cloud import secretmanager
 from google.oauth2 import service_account
 from google.cloud import firestore
 from dotenv import load_dotenv
+from datetime import datetime
+from compositeai.tools import GoogleSerperApiTool, WebScrapeTool
+from compositeai.drivers import OpenAIDriver
+from compositeai.agents import AgentResult
+import pytz
 import os
 import uuid
-from compositeai.agents import AgentResult
-from utils.supplier_data import DataSummary, ESGData
-from datetime import datetime
-import pytz
+import json
+from supplier_data import DataSummary, ESGData
+from agent import Agent
 
 load_dotenv()
  
