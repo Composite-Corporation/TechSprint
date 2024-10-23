@@ -9,11 +9,12 @@ from datetime import datetime
 from compositeai.tools import GoogleSerperApiTool, WebScrapeTool
 from compositeai.drivers import OpenAIDriver
 from compositeai.agents import AgentResult
+from pydantic import BaseModel
 import pytz
 import os
 import uuid
 import json
-from supplier_data import DataSummary, ESGData
+from supplier_data import DataSummary, ESGData, Supplier, AgentSupplier
 from agent import Agent
 
 load_dotenv()
@@ -35,7 +36,7 @@ async def initialize_firestore():
     credentials = service_account.Credentials.from_service_account_info(service_account_info)
 
     # Initialize Firestore client with the credentials
-    return firestore.AsyncClient(project=GCLOUD_PROJECT_NUMBER, credentials=credentials)
+    return firestore.AsyncClient(credentials=credentials)
 
 
 # Use this in your FastAPI app startup
@@ -43,6 +44,36 @@ async def initialize_firestore():
 async def startup_event():
     global db
     db = await initialize_firestore()
+
+
+# HELPER COMPONENT
+# Runs structured output agent to process a task and display expander of results
+# e.g. "Find scope 1 emissions for company"
+def supplier_obtain_esg_data(label: str, task: str, response_format: BaseModel) -> BaseModel:
+    agent = Agent(
+        driver=OpenAIDriver(
+            model="gpt-4o-mini", 
+            seed=1337,
+        ),
+        description=f"""
+        You are an analyst searches the web for a company's sustainability and ESG information.
+
+        Use the Google search tool to find relevant data sources and links.
+        Then, use the Web scraping tool to analyze the content of links of interest.
+
+        BE AS CONCISE AS POSSIBLE.
+        """,
+        tools=[
+            WebScrapeTool(),
+            GoogleSerperApiTool(),
+        ],
+        max_iterations=20,
+        response_format=response_format,
+    )
+    for chunk in agent.execute(task, stream=True):
+        if isinstance(chunk, AgentResult):
+            agent_result = chunk.content
+    return agent_result
 
 
 async def process_company(company_ref, org_id: str):
@@ -53,106 +84,88 @@ async def process_company(company_ref, org_id: str):
         company_name = company_data.get('name', '')
         company_id = str(uuid.uuid4())
 
-        agent = Agent(
-            driver=OpenAIDriver(
-                model="gpt-4o-mini", 
-                seed=1337,
-            ), 
-            description=f"""
-            You are an analyst who searches the web for a company's sustainability and ESG information.
-
-            Use the Google search tool to find relevant data sources and links.
-            Then, use the Web scraping tool to analyze the content of links of interest.
-            Cite quotes from the source to support your answer.
-            Provide a link to the sources.
-
-            BE AS CONCISE AS POSSIBLE.
-            """,
-            tools=[
-                WebScrapeTool(),
-                GoogleSerperApiTool(),
-            ],
-            max_iterations=20,
-            response_format=DataSummary,
-        )
-
-        esg_data = ESGData()
-        esg_score = 0
-
-        async def run_agent(label, task):
-            result = await agent.aexecute(task)
-            if isinstance(result, AgentResult):
-                data_summary = result.content
-                if data_summary.available:
-                    esg_score += 1
-                return data_summary
-            return DataSummary(available=False, summary="", sources=[])
-
         task_prefix = f"""
         Given the following info about a company:
-        Name - {company_name}
+            Name - {company_name}
         """
+        esg_score = 0
 
-        # Scope 1 Emissions
+        task_basic_info = task_prefix + """
+        \nUse the web to find a URL to the company's website and come up with your best description on what this company does.
+        """
+        data_basic_info = supplier_obtain_esg_data(label="Basic Information", task=task_basic_info, response_format=AgentSupplier)
+
         task_scope_1 = task_prefix + """
-        Please find any data on THEIR OWN scope 1 emissions calculations.
+        \nPlease find any data on THEIR OWN scope 1 emissions calculations.
         Scope 1 emissions are direct emissions from sources owned or controlled by a company.
         These include things like: on-site energy, fleet vehicles, process emissions, or accidental emissions.
         ONLY INCLUDE EXPLICIT MENTIONS OF "SCOPE 1" DATA.
         """
-        esg_data.scope_1 = await run_agent("Scope 1 Emissions", task_scope_1)
+        data_scope_1 = supplier_obtain_esg_data(label="Scope 1 Emissions", task=task_scope_1, response_format=DataSummary)
+        esg_score += 1 if data_scope_1.available else 0
 
-        # Scope 2 Emissions
-        task_scope_2 = task_prefix + """
+        task_scope_2 = task_prefix + f"""
         Please find any data on THEIR OWN scope 2 emissions calculations.
         Scope 2 emissions are indirect greenhouse gas (GHG) emissions that result from the generation of energy that an organization purchases and uses.
         These include things like the purchase of electricity from: steam, heat, cooling, etc.
         ONLY INCLUDE EXPLICIT MENTIONS OF "SCOPE 2" DATA.
         """
-        esg_data.scope_2 = await run_agent("Scope 2 Emissions", task_scope_2)
+        data_scope_2 = supplier_obtain_esg_data(label="Scope 2 Emissions", task=task_scope_2, response_format=DataSummary)
+        esg_score += 1 if data_scope_2.available else 0
 
-        # Scope 3 Emissions
         task_scope_3 = task_prefix + """
         Please find any data on THEIR OWN scope 3 emissions calculations.
         Scope 3 emissions are greenhouse gas (GHG) emissions that are a result of activities that a company indirectly affects as part of its value chain, but that are not owned or controlled by the company.
         These include things like: supply chain emissions, use of sold products, waste disposal, employee travel, contracted waste disposal, etc.
         ONLY INCLUDE EXPLICIT MENTIONS OF "SCOPE 3" DATA.
         """
-        esg_data.scope_3 = await run_agent("Scope 3 Emissions", task_scope_3)
+        data_scope_3 = supplier_obtain_esg_data(label="Scope 3 Emissions", task=task_scope_3, response_format=DataSummary)
+        esg_score += 1 if data_scope_3.available else 0
 
-        # Ecovadis Score
         task_ecovadis = task_prefix + "\nPlease find if this company has a publicly available Ecovadis score."
-        esg_data.ecovadis = await run_agent("Ecovadis Score", task_ecovadis)
+        data_ecovadis = supplier_obtain_esg_data(label="Ecovadis Score", task=task_ecovadis, response_format=DataSummary)
+        esg_score += 1 if data_ecovadis.available else 0
 
-        # ISO 14001 Certification
         task_iso_14001 = task_prefix + "\nPlease find if this company has an ISO 14001 certification."
-        esg_data.iso_14001 = await run_agent("ISO 14001 Certification", task_iso_14001)
+        data_iso_14001 = supplier_obtain_esg_data(label="ISO 14001 Certification", task=task_iso_14001, response_format=DataSummary)
+        esg_score += 1 if data_iso_14001.available else 0
 
-        # Product LCA
         task_product_lca = task_prefix + "\nPlease find if this company has any products undergoing a Life Cycle Assessment, or LCA."
-        esg_data.product_lca = await run_agent("Product LCAs", task_product_lca)
+        data_product_lca = supplier_obtain_esg_data(label="Product LCAs", task=task_product_lca, response_format=DataSummary)
+        esg_score += 1 if data_product_lca.available else 0
 
-        # Determine ESG segment
         if esg_score <= 2:
-            esg_data.segment = "Low"
+            segment = "Low"
         elif esg_score <= 4:
-            esg_data.segment = "Medium"
+            segment = "Medium"
         else:
-            esg_data.segment = "High"
+            segment = "High"
 
-        esg_data.updated = datetime.now(pytz.timezone('UTC'))
+        processed_supplier = Supplier(
+            id=company_id,
+            name=data_basic_info.name,
+            website=data_basic_info.website,
+            description=data_basic_info.description,
+            esg=ESGData(
+                scope_1=data_scope_1,
+                scope_2=data_scope_2,
+                scope_3=data_scope_3,
+                ecovadis=data_ecovadis,
+                iso_14001=data_iso_14001,
+                product_lca=data_product_lca,
+                segment=segment,
+                updated=datetime.now(pytz.timezone('Europe/London')),
+            )
+        )
 
-        # Update the Firestore documents with the processing result and status
         supplier_ref = db.document(f"orgs/{org_id}/suppliers/{company_id}")
-        await supplier_ref.set({
-            'esg': esg_data.dict(),
-        })
+        supplier_dict = processed_supplier.model_dump()
+        await supplier_ref.set(supplier_dict)
         await company_ref.update({
-            'esg': esg_data.dict(),
             'processed': True,
             'status': 'success'
         })
-        return esg_data.dict()
+        return processed_supplier.dict()
 
     except Exception as e:
         # Update the Firestore document with error status
