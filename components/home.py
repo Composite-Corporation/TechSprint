@@ -17,6 +17,7 @@ from utils.supplier_data import (
     DataSummary,
     AgentSupplier,
 )
+import pandas as pd
 
 
 # Function to perform fuzzy search on company names and return results with ids
@@ -130,7 +131,7 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
 
 @st.dialog(title="Add New Supplier", width="large")
 def add_dialog():
-    tab1, tab2 = st.tabs(["Individual Upload", "Bulk Upload"])
+    tab1, tab2, tab3 = st.tabs(["Individual Upload", "Bulk Upload", "View Upload Tasks"])
     with tab1:
         with st.form(key="supplier_form", border=False):
             # Input fields for the supplier details
@@ -162,8 +163,76 @@ def add_dialog():
             type=['csv', 'xlsx'],
         )
         if uploaded_file:
-            st.write(":orange[Bulk uploading is a work in progress... Check back with us later...]")
-
+            try:
+                # Determine file type and read accordingly
+                if uploaded_file.name.endswith('.csv'):
+                    df = pd.read_csv(uploaded_file)
+                else:  # Excel file
+                    df = pd.read_excel(uploaded_file)
+                
+                # Check if "Supplier Names" column exists
+                supplier_column = next((col for col in df.columns if col.lower() == "supplier names"), None)
+                
+                if supplier_column:
+                    supplier_names = df[supplier_column].dropna().tolist()
+                    
+                    # Get user_id and org_id from session data
+                    session_data = st.session_state["page"]["data"]["session_data"]
+                    user_id = session_data.get("localId")
+                    org_id = session_data.get("org_id")
+                    
+                    if user_id and org_id:
+                        # Call create_task function
+                        task_id = db.create_task(user_id, org_id, supplier_names)
+                        
+                        st.success(f"Successfully extracted {len(supplier_names)} supplier names and created task with ID: {task_id}")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error("Error: Unable to create task. Missing user or organization information.")
+                else:
+                    st.error("Error: The uploaded file does not contain a 'Supplier Names' column.")
+            except Exception as e:
+                st.error(f"An error occurred while processing the file: {str(e)}")
+        else:
+            st.info("Please ensure your spreadsheet has a column named 'Supplier Names'.")
+    with tab3:
+        # Get org_id from session data
+        org_id = st.session_state["page"]["data"]["session_data"]["org_id"]
+        
+        # Fetch tasks for the organization
+        tasks = db.get_tasks_by_org(org_id)
+        
+        if not tasks:
+            st.info("No upload tasks found for this organization.")
+        else:
+            for task in tasks:
+                with st.expander(f"Task ID: :blue[{task['id']}] - {task['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}"):
+                    total_companies = len(task['companies'])
+                    processed_companies = sum(1 for company in task['companies'] if company['status'] == 'success')
+                    error_companies = sum(1 for company in task['companies'] if company['status'] == 'error')
+                    
+                    # Calculate progress percentage
+                    progress_percentage = (processed_companies / total_companies) * 100 if total_companies > 0 else 0
+                    
+                    # Display progress bar
+                    st.progress(progress_percentage / 100, text=f"Progress: {progress_percentage:.1f}%")
+                    
+                    # Display company details
+                    st.write(f"Total Companies: {total_companies}")
+                    st.write(f"Processed: {processed_companies}")
+                    st.write(f"Errors: {error_companies}")
+                    st.write(f"Remaining: {total_companies - processed_companies - error_companies}")
+                    
+                    # Display company list
+                    if st.checkbox(f"Show Companies", key=f"show_companies_{task['id']}"):
+                        for company in task['companies']:
+                            status_color = {
+                                'success': 'green',
+                                'error': 'red',
+                                'unprocessed': 'orange'
+                            }.get(company['status'], 'gray')
+                            st.markdown(f"- {company['name']}: <font color='{status_color}'>{company['status']}</font>", unsafe_allow_html=True)
 
 
 def home_page():

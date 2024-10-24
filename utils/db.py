@@ -54,7 +54,7 @@ class DB():
             "timestamp": firestore.SERVER_TIMESTAMP,
             "org_id": org_id,
         })
-        
+
 
     def get_user(self, uid: str) -> Optional[dict]:
         doc_ref = self.client.collection("users").document(uid)
@@ -141,5 +141,58 @@ class DB():
                 print(f"Error parsing supplier {doc.id}: {e}")
         
         return supplier_list
+    
+
+    def create_task(self, user_id: str, org_id: str, company_names: List[str]) -> str:
+        # Create a new task document
+        task_ref = self.client.collection("tasks").document()
+        
+        # Set the main task data
+        task_ref.set({
+            "user_id": user_id,
+            "org_id": org_id,
+            "timestamp": firestore.SERVER_TIMESTAMP,
+        })
+        
+        # Add companies as a subcollection
+        companies_collection = task_ref.collection("companies")
+        for company_name in company_names:
+            companies_collection.add({
+                "name": company_name,
+                "processed": False,
+                "status": "unprocessed"
+            })
+        
+        return task_ref.id  # Return the task ID
+    
+
+    def get_tasks_by_org(self, org_id: str) -> List[dict]:
+        # Query tasks collection for documents with matching org_id
+        tasks_query = self.client.collection("tasks").where("org_id", "==", org_id)
+        
+        tasks_data = []
+        
+        for task_doc in tasks_query.stream():
+            task_data = task_doc.to_dict()
+            task_data['id'] = task_doc.id  # Add the task ID to the task data
+            
+            # Get the companies subcollection for each task
+            companies_collection = task_doc.reference.collection("companies")
+            companies = []
+            for company_doc in companies_collection.stream():
+                company_data = company_doc.to_dict()
+                company_data['id'] = company_doc.id  # Add the document ID to the company data
+                companies.append(company_data)
+            
+            # Add the companies list to the task data
+            task_data['companies'] = companies
+            
+            tasks_data.append(task_data)
+        
+        # Sort tasks_data by timestamp in descending order (most recent first)
+        sorted_tasks_data = sorted(tasks_data, key=lambda x: x['timestamp'], reverse=True)
+        
+        return sorted_tasks_data
+
 
 db = DB()
