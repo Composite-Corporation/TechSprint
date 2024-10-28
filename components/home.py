@@ -18,6 +18,7 @@ from utils.supplier_data import (
     AgentSupplier,
 )
 import pandas as pd
+from io import BytesIO
 
 
 # Function to perform fuzzy search on company names and return results with ids
@@ -163,37 +164,61 @@ def add_dialog():
             type=['csv', 'xlsx'],
         )
         if uploaded_file:
-            try:
-                # Determine file type and read accordingly
-                if uploaded_file.name.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                else:  # Excel file
-                    df = pd.read_excel(uploaded_file)
-                
-                # Check if "Supplier Names" column exists
-                supplier_column = next((col for col in df.columns if col.lower() == "supplier names"), None)
-                
-                if supplier_column:
-                    supplier_names = df[supplier_column].dropna().tolist()
+            with st.spinner("Processing..."):
+                try:
+                    # Determine file type and read accordingly
+                    if uploaded_file.name.endswith('.csv'):
+                        df = pd.read_csv(uploaded_file)
+                    else:  # Excel file
+                        df = pd.read_excel(uploaded_file)
                     
-                    # Get user_id and org_id from session data
+                    # Check if "Supplier Names" column exists
+                    supplier_column = next((col for col in df.columns if col.lower() == "supplier names"), None)
+                    if not supplier_column:
+                        raise Exception("No \"Supplier Names\" column")
+                        
+                    # Check user_id and org_id from session data
                     session_data = st.session_state["page"]["data"]["session_data"]
                     user_id = session_data.get("localId")
                     org_id = session_data.get("org_id")
+                    if not user_id or not org_id:
+                        raise Exception("Missing user or organization information")
                     
-                    if user_id and org_id:
-                        # Call create_task function
-                        task_id = db.create_task(user_id, org_id, supplier_names)
-                        
-                        st.success(f"Successfully extracted {len(supplier_names)} supplier names and created task with ID: {task_id}")
+                    # Get supplier names from upload and database, find duplicates
+                    supplier_names_uploaded = df[supplier_column].dropna().tolist()
+                    supplier_names_uploaded_lower = {supplier_name.lower() for supplier_name in supplier_names_uploaded}
+                    suppliers_db = db.get_org_suppliers(org_id=org_id)
+                    supplier_names_db_lower = {supplier.name.lower() for supplier in suppliers_db}
+                    duplicates = supplier_names_uploaded_lower.intersection(supplier_names_db_lower)
+                except Exception as e:
+                    st.error(f"An error occurred while processing the file: {str(e)}")
+
+            # Once processing is finished
+            if duplicates:
+                st.warning("The following companies already exist in the database:")
+                with st.expander("Duplicates"):
+                    for item in duplicates:
+                        st.markdown(f":orange[{item}]")
+                but1, but2 = st.columns([1, 1])
+                with but1:
+                    if st.button("Upload All", use_container_width=True):
+                        task_id = db.create_task(user_id, org_id, list(supplier_names_uploaded))
+                        st.success(f"Successfully extracted {len(supplier_names_uploaded)} supplier names and created task with ID: {task_id}")
                         time.sleep(2)
                         st.rerun()
-                    else:
-                        st.error("Error: Unable to create task. Missing user or organization information.")
-                else:
-                    st.error("Error: The uploaded file does not contain a 'Supplier Names' column.")
-            except Exception as e:
-                st.error(f"An error occurred while processing the file: {str(e)}")
+                with but2:
+                    if st.button("Upload Non-duplicates", use_container_width=True):
+                        # Subtract duplicates from uploaded supplier names
+                        supplier_names_uploaded_lower -= duplicates  # Remove duplicates from the set
+                        task_id = db.create_task(user_id, org_id, list(supplier_names_uploaded_lower))
+                        st.success(f"Successfully extracted {len(supplier_names_uploaded_lower)} supplier names and created task with ID: {task_id}")
+                        time.sleep(2)
+                        st.rerun()
+            else:
+                task_id = db.create_task(user_id, org_id, list(supplier_names_uploaded))
+                st.success(f"Successfully extracted {len(supplier_names_uploaded)} supplier names and created task with ID: {task_id}")
+                time.sleep(2)
+                st.rerun()
         else:
             st.info("Please ensure your spreadsheet has a column named 'Supplier Names'.")
     with tab3:
@@ -259,9 +284,32 @@ def home_page():
     # Title of page
     st.header("ESG Supplier Management System", anchor=False)
     
-    # Button to input new supplier info
-    if st.button(label="Add New Supplier", use_container_width=True):
-        add_dialog()
+    # Create a container for buttons to display them side by side
+    col1, col2 = st.columns(2)
+    with col1:
+        # Button to input new supplier info
+        if st.button(label="Add New Supplier", use_container_width=True):
+            add_dialog()
+    with col2:
+        # Button to download supplier info
+        if st.button(label="Download Supplier Info", use_container_width=True):
+            org_id = st.session_state["page"]["data"]["session_data"]["org_id"]
+            suppliers = db.get_org_suppliers(org_id=org_id)
+            suppliers_info = [(supplier.name, supplier.website, supplier.description, supplier.notes, supplier.esg.segment, supplier.esg) for supplier in suppliers]
+            df = pd.DataFrame(suppliers_info, columns=["Supplier Names", "Website", "Description", "Notes", "ESG Rating", "ESG Data"])
+            
+            # Use BytesIO to create an in-memory buffer for the Excel file
+            excel_file = BytesIO()
+            df.to_excel(excel_file, index=False, engine='openpyxl')
+            excel_file.seek(0)  # Move to the beginning of the BytesIO buffer
+            
+            # Ensure the download button uses the correct data type
+            st.download_button(
+                label="Download Excel",
+                data=excel_file.getvalue(),  # Get the value of the BytesIO buffer
+                file_name="supplier_info.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
     # Filtering UI
     col1, col2 = st.columns([0.5, 0.5])
