@@ -57,6 +57,7 @@ def authenticate():
                 "Scientific Laboratory Supplies (SLS) Ltd.",
                 "Evonik Industries",
                 "Arteco Coolants",
+                "Alides",
             ),
             index=0,
         )
@@ -80,6 +81,9 @@ def authenticate():
             elif "@arteco-coolants.com" in email:
                 org_id = "s41UQTwtMZsueu5K3MZS"
                 org_error = org_name != "Arteco Coolants"
+            elif "@alides.be" in email:
+                org_id = "cvyXtH4aNuKikh0MSWvM"
+                org_error = org_name != "Alides"
 
             if org_id is None:
                 st.error("Unrecognized organization.")

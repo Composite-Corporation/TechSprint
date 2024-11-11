@@ -6,17 +6,21 @@ const axios = require('axios'); // For making API calls
 
 admin.initializeApp();
 
-exports.onTaskCreate = functions.firestore
-  .document('tasks/{taskId}')
+exports.onCompanyCreate = functions.firestore
+  .document('tasks/{taskId}/companies/{companyId}')
   .onCreate(async (snap, context) => {
     // Wait for 10 seconds before proceeding
     await new Promise(resolve => setTimeout(resolve, 10000));
     
     const data = snap.data();
-    const taskId = snap.id; // Store the document ID of the created document
+    const companyId = snap.id; // Store the document ID of the created company
+    const taskId = context.params.taskId; // Get the task ID from the context
 
-    // Extract the org_id from the document
-    const orgId = data["org_id"];
+    // Extract the org_id from the parent task document
+    const taskRef = admin.firestore().collection('tasks').doc(taskId);
+    const taskSnap = await taskRef.get();
+    const orgId = taskSnap.data()?.org_id;
+
     if (!orgId) {
       console.error(`Error: org_id not found in task document ${taskId}`);
       return;
@@ -25,30 +29,13 @@ exports.onTaskCreate = functions.firestore
     // Retrieve Cloud Run API URL
     const cloudRunApiUrl = "https://sls-prototype-task-api-228031574235.europe-north1.run.app/task_upload";
 
-    // Get a reference to the companies subcollection
-    const subcollectionRef = snap.ref.collection('companies');
+    const payload = { task_doc_id: taskId, company_doc_id: companyId, org_id: orgId };
 
-    // Retrieve the companies documents
-    const companiesSnapshot = await subcollectionRef.get();
-    console.log(`Number of companies retrieved: ${companiesSnapshot.size}`);
-
-    // Prepare API calls for each company
-    const apiCalls = companiesSnapshot.docs.map((doc) => {
-      const companyDocId = doc.id; // Updated to get the document ID from the reference
-      const payload = { task_doc_id: taskId, company_doc_id: companyDocId, org_id: orgId };
-      return axios.post(cloudRunApiUrl, payload)
-        .then(response => {
-          console.log(`Successfully called Cloud Run API for company ${companyDocId}: ${response.status}`);
-        })
-        .catch(error => {
-          console.error(`Error calling Cloud Run API for company ${companyDocId}:`, error);
-        });
-    });
-
+    // Make a single API call for the new company
     try {
-      // Make API calls concurrently
-      await Promise.all(apiCalls);
+      const response = await axios.post(cloudRunApiUrl, payload);
+      console.log(`Successfully called Cloud Run API for company ${companyId}: ${response.status}`);
     } catch (error) {
-      console.error('Error making API calls:', error);
+      console.error(`Error calling Cloud Run API for company ${companyId}:`, error);
     }
   });
