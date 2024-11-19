@@ -102,7 +102,13 @@ def supplier_display(supplier: Supplier):
     elif supplier.esg.segment == "Low":
         color = "red"
     container.write(f"**Website**: {supplier.website}")
-    container.write(f"**Description**: {supplier.description}")
+    container.write(f"**Description**: '{supplier.description[:100]}...'")
+    if supplier.esg.reduction_targets.available:
+        reduction_summary = supplier.esg.reduction_targets.summary
+        container.write(f"**Reduction Targets**: {reduction_summary}")
+    elif supplier.esg.ecovadis.available:
+        ecovadis_summary = supplier.esg.ecovadis.summary
+        container.write(f"**Ecovadis Score**: {ecovadis_summary}")
     container.write(f"**ESG Segment**: :{color}[{supplier.esg.segment}]")
 
 
@@ -113,18 +119,19 @@ def supplier_esg_expander(property: str, data_summary: DataSummary):
     available = data_summary.available
     emoji = "✅" if available else "❌"
     label = f"{emoji} {property}"
-    expander = st.expander(label=label, expanded=False)
-    expander.subheader(body="**Overview**", anchor=False)
-    expander.write(data_summary.summary)
+    with st.expander(label=label, expanded=False):
+        st.subheader(body="**Overview**", anchor=False)
+        st.write(data_summary.summary)
 
-    if available:
-        expander.divider()
-        expander.subheader(body="**Sources**", anchor=False)
-        for source in data_summary.sources:
-            expander.markdown(f"""              
-            Key Quote: "{source.key_quote}"\n
-            URL: {source.link}
-            """)
+        if available:
+            st.divider()
+            st.subheader(body="**Sources**", anchor=False)
+            for source in data_summary.sources:
+                with st.container(border=True):
+                    st.markdown(f"""              
+                    Key Quote: "{source.key_quote}"\n
+                    URL: {source.link}
+                    """)
 
 
 # HELPER COMPONENT

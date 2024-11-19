@@ -18,6 +18,7 @@ class ESGData(BaseModel):
     scope_2: DataSummary
     scope_3: DataSummary
     ecovadis: DataSummary
+    reduction_targets: Optional[DataSummary]
     iso_14001: DataSummary
     product_lca: DataSummary
     segment: str

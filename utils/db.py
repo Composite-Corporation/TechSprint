@@ -133,6 +133,8 @@ class DB():
         # Iterate over each document
         for doc in docs:
             data = doc.to_dict()
+            if "reduction_targets" not in data["esg"]:
+                data["esg"]["reduction_targets"] = {"available": False, "summary": "", "sources": []}
             try:
                 # Deserialize Firestore data into a Supplier instance
                 supplier = Supplier(**data)

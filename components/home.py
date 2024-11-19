@@ -86,6 +86,10 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
     data_ecovadis = supplier_obtain_esg_data(label="Ecovadis Score", task=task_ecovadis, response_format=DataSummary)
     esg_score += 1 if data_ecovadis.available else 0
 
+    task_reduction_targets = task_prefix + "\nPlease find if this company has set any carbon emissions reduction targets."
+    data_reduction_targets = supplier_obtain_esg_data(label="Reduction Targets", task=task_reduction_targets, response_format=DataSummary)
+    esg_score += 1 if data_reduction_targets.available else 0
+
     task_iso_14001 = task_prefix + "\nPlease find if this company has an ISO 14001 certification."
     data_iso_14001 = supplier_obtain_esg_data(label="ISO 14001 Certification", task=task_iso_14001, response_format=DataSummary)
     esg_score += 1 if data_iso_14001.available else 0
@@ -96,7 +100,7 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
 
     if esg_score <= 2:
         segment = "Low"
-    elif esg_score <= 4:
+    elif esg_score <= 5:
         segment = "Medium"
     else:
         segment = "High"
@@ -110,6 +114,7 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
             scope_2=data_scope_2,
             scope_3=data_scope_3,
             ecovadis=data_ecovadis,
+            reduction_targets=data_reduction_targets,
             iso_14001=data_iso_14001,
             product_lca=data_product_lca,
             segment=segment,

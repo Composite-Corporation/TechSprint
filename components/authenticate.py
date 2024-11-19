@@ -58,6 +58,7 @@ def authenticate():
                 "Evonik Industries",
                 "Arteco Coolants",
                 "Alides",
+                "Dutscher",
             ),
             index=0,
         )
@@ -84,12 +85,15 @@ def authenticate():
             elif "@alides.be" in email:
                 org_id = "cvyXtH4aNuKikh0MSWvM"
                 org_error = org_name != "Alides"
+            elif "@dutscher.com" in email:
+                org_id = "mq7mcPrZ67wJRTcBiP9L"
+                org_error = org_name != "Dutscher"
 
             if org_id is None:
                 st.error("Unrecognized organization.")
                 return
             if org_error:
-                st.error("Your are not authorized to join this organization.")
+                st.error("You are not authorized to join this organization.")
                 return
             
             session_data, message = auth.sign_up(email, password)
