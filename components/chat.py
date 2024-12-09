@@ -85,7 +85,7 @@ def chat_suppliers():
     # Setup sidebar chat
     with st.sidebar:
         # Display CompositeAI logo
-        st.image("static/composite.png", output_format="PNG", width=300)
+        #st.image("static/composite.png", output_format="PNG", width=300)
 
         # Display sidebar title and user settings button
         col1, col2 = st.columns([0.8, 0.2])
