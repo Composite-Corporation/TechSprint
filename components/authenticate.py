@@ -17,7 +17,7 @@ import streamlit as st
 def authenticate():
 
     # Set logo and title
-    #st.image("static/composite.png", output_format="PNG", width=400)
+    st.image("static/composite.png", output_format="PNG", width=400)
     st.header(body="**Account Authentication**", anchor=False)
 
     # Tabs for Sign Up, Login, and Forgot Password
@@ -59,6 +59,7 @@ def authenticate():
                 "Arteco Coolants",
                 "Alides",
                 "Dutscher",
+                "Gantrade Europe BV",
             ),
             index=0,
         )
@@ -88,6 +89,9 @@ def authenticate():
             elif "@dutscher.com" in email:
                 org_id = "mq7mcPrZ67wJRTcBiP9L"
                 org_error = org_name != "Dutscher"
+            elif "@gantrade.com" in email:
+                org_id = "1VUdDwkZAhV5UP5anUZn"
+                org_error = org_name != "Gantrade Europe BV"
 
             if org_id is None:
                 st.error("Unrecognized organization.")
