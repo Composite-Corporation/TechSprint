@@ -17,7 +17,7 @@ import streamlit as st
 def authenticate():
 
     # Set logo and title
-    #st.image("static/composite.png", output_format="PNG", width=400)
+    st.image("static/composite.png", output_format="PNG", width=400)
     st.header(body="**Account Authentication**", anchor=False)
 
     # Tabs for Sign Up, Login, and Forgot Password

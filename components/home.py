@@ -137,6 +137,7 @@ def processing_dialog(name: str, website: str = None, description: str = None, n
 
 @st.dialog(title="Add New Supplier", width="large")
 def add_dialog():
+    org_id = st.session_state["page"]["data"]["session_data"]["org_id"]
     tab1, tab2, tab3 = st.tabs(["Individual Upload", "Bulk Upload", "View Upload Tasks"])
     with tab1:
         with st.form(key="supplier_form", border=False):
@@ -151,7 +152,15 @@ def add_dialog():
 
             # Submit logic
             if submit:
-                if name:
+                # Conduct checks
+                suppliers_db = db.get_org_suppliers(org_id=org_id)
+                num_suppliers_db = len(suppliers_db)
+                if num_suppliers_db >= 10:
+                    st.error("Your plan current supports only 10 total suppliers in your database.")
+                elif not name:
+                    st.error("Please provide the supplier name.")
+                else:
+                    # Continue with submission
                     st.session_state["page"]["data"]["processing_supplier"] = True
                     st.session_state["page"]["data"]["add_supplier"] = {
                         "name": name,
@@ -160,8 +169,6 @@ def add_dialog():
                         "notes": notes,
                     }
                     st.rerun()
-                else:
-                    st.error("Please provide the supplier name.")
     with tab2:
         uploaded_file = st.file_uploader(
             label="Choose CSV or Excel File", 
@@ -189,16 +196,31 @@ def add_dialog():
                     if not user_id or not org_id:
                         raise Exception("Missing user or organization information")
                     
-                    # Get supplier names from upload and database, find duplicates
+                    # Get supplier names from upload and database
                     supplier_names_uploaded = df[supplier_column].dropna().tolist()
                     supplier_names_uploaded_lower = {supplier_name.lower() for supplier_name in supplier_names_uploaded}
+                    num_supplier_upload = len(supplier_names_uploaded_lower)
                     suppliers_db = db.get_org_suppliers(org_id=org_id)
+                    num_suppliers_db = len(suppliers_db)
+
+                    # Check number of suppliers to upload (max 10 as of 12/10/24)
+                    over_capacity = False
+                    if num_supplier_upload + num_suppliers_db > 10:
+                        over_capacity = True
+
+                    # Filter out duplicuates
                     supplier_names_db_lower = {supplier.name.lower() for supplier in suppliers_db}
                     duplicates = supplier_names_uploaded_lower.intersection(supplier_names_db_lower)
                 except Exception as e:
                     st.error(f"An error occurred while processing the file: {str(e)}")
 
-            # Once processing is finished
+            # Check if capacity of suppliers in the system is going to be over
+            if over_capacity:
+                st.error("Your plan current supports only 10 total suppliers in your database.")
+                time.sleep(2)
+                st.rerun()
+
+            # Check for duplicates and ask
             if duplicates:
                 st.warning("The following companies already exist in the database:")
                 with st.expander("Duplicates"):
